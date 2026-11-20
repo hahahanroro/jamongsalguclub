@@ -1,0 +1,78 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>자몽살구클럽 · STAGE 01 최종본</title><style>
+*{box-sizing:border-box}body{margin:0;background:#201b2b;color:#fff;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center}.shell{width:min(96vw,1280px);position:relative;aspect-ratio:1280/755;border:7px solid #f6d7ef;border-radius:24px;overflow:hidden;background:#a992bc;box-shadow:0 15px 55px #090711}canvas{width:100%;height:100%;display:block}.hot{position:absolute;border:0;background:transparent;cursor:pointer}.hot:focus-visible{outline:4px solid #fff;border-radius:40px}.controls{position:absolute;bottom:12px;right:12px;display:none;gap:8px}.controls button,.modal button,.bar button{border:3px solid #fff5fc;background:#eab6d5;color:#4e3d5d;border-radius:24px;font-size:18px;font-weight:900;padding:10px 22px;box-shadow:0 5px #a37eaa;cursor:pointer}.bar{position:absolute;top:88px;right:14px;display:none}.bar button{padding:5px 12px;font-size:14px}.bar{display:none;gap:8px}.bar #musicToggle{background:#f9e4f1} .modal{position:absolute;inset:0;background:#1e1725b7;display:none;align-items:center;justify-content:center;padding:3%;z-index:10;backdrop-filter:blur(2px)}
+.modal .panel{height:92%;max-width:660px;width:76%;border:5px solid #fff8f6;border-radius:32px;background:linear-gradient(#fff2f5,#fae2f0);color:#5b436b;display:flex;align-items:center;justify-content:space-around;flex-direction:column;padding:18px 24px;text-align:center;box-shadow:0 11px 0 #8d739d,0 22px 35px #27182b7c;position:relative;overflow:hidden}
+.modal .panel:before{content:'✧';position:absolute;top:9px;left:15px;color:#e7a1c7;font-size:27px}.modal .panel:after{content:'✧';position:absolute;top:9px;right:15px;color:#e7a1c7;font-size:27px}
+.panel h2{font-size:clamp(15px,2.7vw,29px);margin:5px 0;color:#684a75;letter-spacing:1px}.panel img{max-height:68%;max-width:91%;object-fit:contain;filter:drop-shadow(4px 5px 0 #9279a3);border-radius:3px}.panel.poster img{max-height:76%;max-width:86%;border:0;outline:0;filter:drop-shadow(5px 6px 0 #9279a3)}.panel.ticket img{max-height:49%;max-width:89%;filter:drop-shadow(7px 9px 0 #ab8cae)}.panel p{font-size:clamp(13px,1.9vw,21px);font-weight:800;margin:6px}.modal button{font-size:clamp(12px,1.7vw,19px);white-space:nowrap}.toast{position:absolute;top:20%;left:50%;transform:translateX(-50%);font-size:clamp(12px,2vw,23px);font-weight:900;background:#6e527fea;padding:9px 23px;border:3px solid #fff;border-radius:40px;pointer-events:none;display:none;white-space:nowrap;z-index:7}.bar{z-index:8;display:none;align-items:center;gap:8px}.bar #skip{background:#f4d3e6;border-color:#fff;color:#5b426a}.controls{z-index:8}@media(max-width:750px){.controls{display:flex}.controls button{font-size:13px;padding:8px 14px}.modal .panel{width:94%;height:92%;padding:7px}.panel img{max-height:55%}.panel.poster img{max-height:70%}}
+</style></head><body><audio id="posterVoice" preload="auto" src="assets/asset_01.m4a"></audio><audio id="runMusic" preload="auto" loop src="assets/asset_02.m4a"></audio><div class="shell" id="shell"><canvas id="cv" width="1280" height="755"></canvas><div class="controls" id="controls"><button id="jump">↑ 점프</button><button id="slide">↓ 슬라이드</button></div><div class="bar" id="bar"><button id="musicToggle">♫ 음악 켜짐</button><button id="pause">Ⅱ 일시정지</button><button id="skip" title="달리기를 건너뛰고 음악실로 이동">건너뛰기 ⇥</button></div><div class="toast" id="toast"></div><div class="modal" id="modal"><div class="panel"><h2 id="mh"></h2><img id="mi"><p id="mt"></p><button id="next"></button></div></div></div><script>const DATA={"title":"assets/asset_03.png","story":"assets/asset_04.png","hall":"assets/asset_05.png","soha":"assets/asset_06.png","poster":"assets/asset_07.png","ticket":"assets/asset_08.png","books":"assets/asset_09.png","desk":"assets/asset_10.png","cart":"assets/asset_11.png","bag":"assets/asset_12.png"};const img={};for(const [k,v] of Object.entries(DATA)){img[k]=new Image();img[k].src=v}
+const c=document.getElementById('cv'),ctx=c.getContext('2d'),modal=document.getElementById('modal'),panel=modal.querySelector('.panel'),mh=document.getElementById('mh'),mi=document.getElementById('mi'),mt=document.getElementById('mt'),next=document.getElementById('next'),controls=document.getElementById('controls'),bar=document.getElementById('bar'),toast=document.getElementById('toast');
+let state='title',paused=false,hearts=3,got=0,distance=0,last=0,vy=0,py=0,slide=0,invuln=0,entities=[],speed=4.7,ended=false,shake=0,particles=[],keys={};
+const WORLD=10800,GROUND=661,SOHA_X=122;let milestones=[];
+const posterVoice=document.getElementById('posterVoice'),runMusic=document.getElementById('runMusic'),musicToggle=document.getElementById('musicToggle');
+let audioOn=true;
+posterVoice.volume=1;runMusic.volume=.7;
+function safePlay(a){if(!audioOn)return;const p=a.play();if(p&&p.catch)p.catch(()=>{});}
+function stopTrack(a){a.pause();try{a.currentTime=0}catch(_){}}
+function silence(){stopTrack(posterVoice);stopTrack(runMusic)}
+function playPosterVoice(){stopTrack(runMusic);stopTrack(posterVoice);safePlay(posterVoice)}
+function playRunMusic(){stopTrack(posterVoice);stopTrack(runMusic);safePlay(runMusic)}
+function setPaused(on){paused=on;if(state==='run'){if(on)runMusic.pause();else safePlay(runMusic)}}
+musicToggle.onclick=(e)=>{e.stopPropagation();audioOn=!audioOn;musicToggle.textContent=audioOn?'♫ 음악 켜짐':'♫ 음악 꺼짐';if(!audioOn)silence();else if((state==='run'&&!paused)||state==='end')safePlay(runMusic);else if(modal.style.display==='flex'&&mh.textContent.includes('모집 포스터'))safePlay(posterVoice)};
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='run')setPaused(true)});
+
+function draw(k,x,y,w,h){const im=img[k];if(im&&im.complete&&im.naturalWidth)ctx.drawImage(im,x,y,w,h)}
+function rect(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h)}
+function round(x,y,w,h,r,fill,stroke='#fff5ff',lw=3){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(lw){ctx.lineWidth=lw;ctx.strokeStyle=stroke;ctx.stroke()}}
+function text(s,x,y,size=26,color='#fff',align='left'){ctx.fillStyle=color;ctx.font=`900 ${size}px 'Malgun Gothic',sans-serif`;ctx.textAlign=align;ctx.fillText(s,x,y);ctx.textAlign='left'}
+function setState(s){if(s!=='run'&&s!=='end')silence();state=s;document.getElementById('pause').style.display=s==='run'?'':'none';document.getElementById('skip').style.display=s==='run'?'':'none';modal.style.display='none';controls.style.display=s==='run'?'flex':'none';bar.style.display=(s==='run'||s==='end')?'flex':'none'}
+function show(h,asset,t,b,cb){mh.textContent=h;mi.src=DATA[asset];mt.textContent=t;next.textContent=b;panel.className='panel '+asset;modal.style.display='flex';next.onclick=cb}
+function title(){setState('title')}
+function story(){setState('story')}
+function poster(){document.getElementById('menuReturn')?.remove();show('✧ 자몽살구클럽 모집 포스터 ✧','poster','모집 글을 읽었다. 뒷면에 티켓이 있다던데…?','뒷면 확인하기 ▶',ticket);playPosterVoice()}
+function ticket(){stopTrack(posterVoice);show('✧ 포스터 뒷면의 티켓 ✧','ticket','소하: “내일 오후 5시 음악실…? 티켓 조각을 모아보자!”','티켓 조각 모으러 가기 ▶',start)}
+function makeWorld(){entities=[];milestones=[];let x=1050;
+// Each ticket lies in a clear rest area after an obstacle, never over or immediately beside an obstacle.
+const patterns=['books','desk','cart','books','desk','cart','books','desk','cart','books'];
+patterns.forEach((kind,i)=>{let w=kind==='books'?89:kind==='desk'?158:119,h=kind==='books'?94:kind==='desk'?83:kind==='cart'?126:88;
+ entities.push({type:kind,x,y:GROUND-h,w,h,hit:false});
+ if(i===0||i===2||i===4||i===6||i===8){entities.push({type:'ticket',x:x+465,y:GROUND-106,w:86,h:53,hit:false,required:true})}
+ x+=850;});
+// catch-up ticket opportunities, long safe spacing before the music room
+for(let i=0;i<4;i++)entities.push({type:'ticket',x:10070+i*145,y:GROUND-103,w:82,h:48,hit:false,required:false});}
+function start(){setState('run');runMusic.loop=true;paused=false;playRunMusic();hearts=3;got=0;distance=0;vy=0;py=0;slide=0;invuln=0;ended=false;shake=0;particles=[];makeWorld();last=performance.now()}
+function jump(){if(state==='run'&&!paused&&py>=-0.01){vy=-23.5;py=-1;slide=0}}
+function duck(){if(state==='run'&&!paused&&py>=-0.01)slide=39}
+function skipStage(){if(state!=='run')return;got=5;distance=WORLD;paused=false;finish(true)}
+document.getElementById('skip').onclick=(e)=>{e.stopPropagation();skipStage()};
+function flash(s){toast.textContent=s;toast.style.display='block';clearTimeout(flash.timer);flash.timer=setTimeout(()=>toast.style.display='none',1100)}
+function finish(win){if(ended)return;ended=true;if(!win)stopTrack(runMusic);else runMusic.loop=false;setState('end');show(win?'✧ 음악실에 도착했어! ✧':'✧ 다시 도전해 볼까? ✧','ticket',win?'소하: “나는 살기 위해 \'우리\'가 필요하다.”':'조금 더 천천히, 점프하고 슬라이드해 보자.','다시 플레이 ▶',start);let old=document.getElementById('menuReturn');if(old)old.remove();let back=document.createElement('button');back.id='menuReturn';back.textContent='타이틀로';back.style.marginLeft='8px';back.onclick=()=>{back.remove();title()};next.after(back)}
+function collide(a,b){return a.x < b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
+function update(dt){if(state!=='run'||paused)return;let d=Math.min(dt/16.666,2);distance+=speed*d;vy+=0.79*d;py+=vy*d;if(py>0){py=0;vy=0}slide=Math.max(0,slide-d);invuln=Math.max(0,invuln-d);shake=Math.max(0,shake-d);
+ const player={x:SOHA_X+64,y:slide>0?GROUND-61:GROUND-127+py,w:52,h:slide>0?52:113};
+ for(const e of entities){if(e.hit)continue;let screen={x:e.x-distance+270,y:e.y,w:e.w,h:e.h};if(screen.x>1350||screen.x<-200)continue;
+ let area=e.type==='ticket'?{x:screen.x-13,y:screen.y-12,w:screen.w+26,h:screen.h+24}:{x:screen.x+22,y:screen.y+18,w:screen.w-44,h:screen.h-28};
+ if((e.type==='ticket' && screen.x < SOHA_X+155 && screen.x+screen.w > SOHA_X+55) || (e.type!=='ticket' && collide(player,area))){
+  e.hit=true;
+  if(e.type==='ticket'){if(got<5){got++;flash('✧ 티켓 조각 획득! '+got+' / 5');for(let i=0;i<11;i++)particles.push({x:screen.x+30,y:screen.y+20,vx:(Math.random()-.5)*8,vy:-Math.random()*7,life:35})}}
+  else if(invuln<=0){hearts--;invuln=95;shake=12;flash('앗! '+(e.type==='books'?'책 더미':e.type==='desk'?'책상':'책 수레')+'에 부딪혔어');if(hearts<=0){finish(false);return}}
+ }}
+ for(const p of particles){p.x+=p.vx*d;p.y+=p.vy*d;p.vy+=.2*d;p.life-=d}particles=particles.filter(p=>p.life>0);
+ if(distance>=WORLD){if(got>=5)finish(true);else{distance=9850;flash('아직 티켓 조각이 부족해!')}}}
+function hallway(){let off=(distance*.46)%1014;rect(0,0,1280,755,'#d9b5d5');for(let x=-off-1014;x<1300;x+=1014)draw('hall',x,0,1014,755);}
+function doodles(){ctx.save();ctx.globalAlpha=.8;let off=(distance*.5)%430;for(let x=200-off;x<1280;x+=430){text('✦',x+14,552,17,'#ffe0b8');text('✧',x+80,580,14,'#ffe3ef')}ctx.restore()}
+function game(){hallway();doodles();for(const e of entities){let ex=e.x-distance+270;if(ex<-205||ex>1390||e.hit)continue;
+ if(e.type==='ticket'){let bob=Math.sin(distance/84+e.x/60)*6;ctx.save();ctx.translate(ex+e.w/2,e.y+e.h/2+bob);ctx.rotate(Math.sin(distance/120+e.x/95)*.09);ctx.shadowColor='#fff0e8';ctx.shadowBlur=19;draw('ticket',-e.w/2,-e.h/2,e.w,e.h);ctx.restore();text('✧',ex-19,e.y-9,24,'#fff9d0');text('✧',ex+e.w+4,e.y+e.h+5,22,'#fff9df')}
+ else {ctx.save();ctx.shadowColor='#765c8e70';ctx.shadowBlur=8;ctx.shadowOffsetY=5;draw(e.type,ex,e.y,e.w,e.h);ctx.restore()}}
+ if(invuln<=0||Math.floor(invuln/5)%2===0){const t=distance/19;ctx.save();if(slide>0){ctx.translate(SOHA_X+90,GROUND-43);ctx.rotate(-.7);draw('soha',-66,-70,145,124)}else{let bob=py===0?Math.sin(t)*3:0;draw('soha',SOHA_X,GROUND-205+py+bob,190,205)}ctx.restore()}
+ for(const p of particles)text('✦',p.x,p.y,24,'#fff1bf');
+ // separate clean HUD: no baked-in overlay text in the scrolling backdrop
+ round(18,14,315,65,32,'#6c527fdc');draw('soha',24,16,56,58);text('소하',90,58,29);for(let i=0;i<3;i++)text(i<hearts?'♥':'♡',168+i*45,58,38,i<hearts?'#f3a2ce':'#e9ddf2');
+ round(962,14,300,65,31,'#6c527fdd');draw('ticket',980,29,60,37);text('티켓 조각 '+got+' / 5',1047,57,25);
+ round(405,79,480,55,27,'#6c527fdd');text('✦ 분홍색 티켓 조각을 모으자! ✦',645,114,25,'#fff','center');
+ round(100,712,1066,16,8,'#735b92c8');round(105,716,Math.max(4,1056*Math.min(distance/WORLD,1)),8,4,'#f6b0da','#f6b0da',0);text('🏫',1173,731,34);
+ if(paused){rect(0,0,1280,755,'#201727a8');round(430,270,420,165,26,'#645070e9');text('일시정지',640,337,43,'#fff','center');text('화면을 누르거나 P를 눌러 계속',640,399,22,'#fff','center')}
+}
+function render(t){let dt=last?t-last:16;last=t;ctx.clearRect(0,0,1280,755);if(state==='title')draw('title',0,0,1280,755);else if(state==='story')draw('story',0,0,1280,755);else if(state==='run'){update(dt);game()}else if(state==='end'){hallway();draw('soha',122,425,190,210)}requestAnimationFrame(render)}requestAnimationFrame(render);
+function pos(ev){let r=c.getBoundingClientRect();return {x:(ev.clientX-r.left)*1280/r.width,y:(ev.clientY-r.top)*755/r.height}}
+c.addEventListener('click',e=>{const p=pos(e);if(state==='title'){if(p.x>690&&p.y>400&&p.y<530)story();else if(p.x>700&&p.y>=530&&p.y<640)show('조작 방법','ticket','스페이스/↑: 점프 · ↓: 슬라이드 · P: 일시정지 · K: 스킵 · 티켓 조각 5개를 모아 음악실에 도착하세요!','확인 ▶',title);else if(p.x>700&&p.y>=640)show('자몽살구클럽','ticket','브라우저 탭을 닫으면 종료할 수 있어.','돌아가기 ▶',title)}else if(state==='story')poster();else if(state==='run'){if(paused)setPaused(false);else jump()}});
+window.addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();if(state==='run'){if(e.code==='Space'||e.code==='ArrowUp')jump();if(e.code==='ArrowDown')duck();if(e.code==='Escape'||e.code==='KeyP')setPaused(!paused);if(e.code==='KeyK')skipStage()}else if(state==='title'&&(e.code==='Enter'||e.code==='Space'))story();else if(state==='story'&&(e.code==='Enter'||e.code==='Space'))poster()});document.getElementById('jump').onclick=e=>{e.stopPropagation();jump()};document.getElementById('slide').onclick=e=>{e.stopPropagation();duck()};document.getElementById('pause').onclick=e=>{e.stopPropagation();setPaused(!paused)};
+</script></body></html>
